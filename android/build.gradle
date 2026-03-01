@@ -1,43 +1,12 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 buildscript {
-    
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.3.0'
-        classpath 'com.google.gms:google-services:4.3.15'
-
-        // NOTE: Do not place your application dependencies here; they belong
-        // in the individual module build.gradle files
-    }
-}
-
-apply from: "variables.gradle"
-
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-
-task clean(type: Delete) {
-    delete rootProject.buildDir
-}
-
-
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
-
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        // Version 8.2.2 est très stable pour le SDK 34
+        // On repasse en 8.2.2 pour une meilleure compatibilité SDK 34
         classpath 'com.android.tools.build:gradle:8.2.2'
         classpath 'com.google.gms:google-services:4.3.15'
     }
@@ -52,15 +21,11 @@ allprojects {
     }
 }
 
-// Ce bloc force les bibliothèques AndroidX à rester sur la version 1.13.1
-// car la version 1.15.0+ exige le SDK 35 que le serveur n'a pas.
+// Ce bloc empêche les dépendances de forcer le passage au SDK 35
 subprojects {
     project.configurations.all {
         resolutionStrategy.eachDependency { details ->
-            if (details.requested.group == 'androidx.core' && details.requested.name == 'core') {
-                details.useVersion "1.13.1"
-            }
-            if (details.requested.group == 'androidx.core' && details.requested.name == 'core-ktx') {
+            if (details.requested.group == 'androidx.core' && (details.requested.name == 'core' || details.requested.name == 'core-ktx')) {
                 details.useVersion "1.13.1"
             }
         }
