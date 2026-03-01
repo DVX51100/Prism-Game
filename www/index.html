@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>PRISM — Match 3</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --border: #1e1e2e;
+    --text: #e8e8f0;
+    --muted: #555570;
+    --c1: #ff6b6b;
+    --c2: #ffd93d;
+    --c3: #6bcb77;
+    --c4: #4d96ff;
+    --c5: #c77dff;
+    --c6: #ff9f43;
+    --score-glow: #4d96ff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(ellipse at 30% 20%, rgba(77,150,255,0.05) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 80%, rgba(199,125,255,0.05) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+  }
+
+  header { text-align: center; }
+
+  .logo {
+    font-size: 2.2rem;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    background: linear-gradient(135deg, #4d96ff, #c77dff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .tagline {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .stats { display: flex; gap: 30px; align-items: center; }
+  .stat { text-align: center; }
+
+  .stat-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .stat-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+    transition: all 0.3s;
+  }
+
+  .stat-value.pop {
+    color: var(--score-glow);
+    transform: scale(1.2);
+  }
+
+  .moves-bar {
+    width: 200px;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .moves-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4d96ff, #c77dff);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+
+  .board-wrap {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px;
+    box-shadow: 0 0 40px rgba(77,150,255,0.06), 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  #board {
+    display: grid;
+    grid-template-columns: repeat(8, 44px);
+    grid-template-rows: repeat(8, 44px);
+    gap: 4px;
+  }
+
+  .cell {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    user-select: none;
+    border: 1.5px solid transparent;
+  }
+
+  .cell svg { filter: drop-shadow(0 0 3px rgba(255,255,255,0.3)); }
+  .cell:hover { transform: scale(1.08); z-index: 2; }
+
+  .cell.selected {
+    border-color: white;
+    transform: scale(1.12);
+    z-index: 3;
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.3), 0 0 20px rgba(255,255,255,0.2);
+  }
+
+  .cell.matched { animation: matchPop 0.35s ease forwards; }
+  .cell.falling { animation: fallIn 0.25s ease forwards; }
+  .cell.hint { animation: hintPulse 0.8s ease infinite; }
+
+  @keyframes matchPop {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.3); opacity: 0.5; }
+    100% { transform: scale(0); opacity: 0; }
+  }
+
+  @keyframes fallIn {
+    0% { transform: translateY(-20px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+
+  @keyframes hintPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.4); }
+    50% { box-shadow: 0 0 0 4px rgba(255,255,255,0.4); }
+  }
+
+  .combo-banner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2rem;
+    font-weight: 800;
+    color: white;
+    text-shadow: 0 0 20px rgba(77,150,255,0.8);
+    pointer-events: none;
+    opacity: 0;
+    z-index: 10;
+    transition: none;
+  }
+
+  .combo-banner.show { animation: comboPop 1s ease forwards; }
+
+  @keyframes comboPop {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+    30% { opacity: 1; transform: translate(-50%, -60%) scale(1.1); }
+    70% { opacity: 1; transform: translate(-50%, -65%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -80%) scale(0.9); }
+  }
+
+  .btn {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 10px 24px;
+    border-radius: 8px;
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn:hover { border-color: var(--text); color: var(--text); }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #4d96ff, #c77dff);
+    border-color: transparent;
+    color: white;
+  }
+
+  .btn-primary:hover { opacity: 0.85; color: white; }
+  .controls { display: flex; gap: 10px; }
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10,10,15,0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s;
+  }
+
+  .overlay.show { opacity: 1; pointer-events: all; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 40px;
+    text-align: center;
+    max-width: 320px;
+    width: 90%;
+    transform: scale(0.9);
+    transition: transform 0.4s;
+  }
+
+  .overlay.show .modal { transform: scale(1); }
+
+  .modal h2 { font-size: 1.8rem; font-weight: 800; margin-bottom: 8px; }
+
+  .modal p {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 24px;
+  }
+
+  .modal .final-score {
+    font-size: 3rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #4d96ff, #c77dff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 24px;
+  }
+
+  .gem-0 { background: rgba(255,107,107,0.15); }
+  .gem-1 { background: rgba(255,217,61,0.15); }
+  .gem-2 { background: rgba(107,203,119,0.15); }
+  .gem-3 { background: rgba(77,150,255,0.15); }
+  .gem-4 { background: rgba(199,125,255,0.15); }
+  .gem-5 { background: rgba(255,159,67,0.15); }
+
+  .gem-0.selected { border-color: var(--c1); box-shadow: 0 0 16px rgba(255,107,107,0.4); }
+  .gem-1.selected { border-color: var(--c2); box-shadow: 0 0 16px rgba(255,217,61,0.4); }
+  .gem-2.selected { border-color: var(--c3); box-shadow: 0 0 16px rgba(107,203,119,0.4); }
+  .gem-3.selected { border-color: var(--c4); box-shadow: 0 0 16px rgba(77,150,255,0.4); }
+  .gem-4.selected { border-color: var(--c5); box-shadow: 0 0 16px rgba(199,125,255,0.4); }
+  .gem-5.selected { border-color: var(--c6); box-shadow: 0 0 16px rgba(255,159,67,0.4); }
+
+  .level-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    background: var(--border);
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrapper">
+  <header>
+    <div class="logo">PRISM</div>
+    <div class="tagline">Match · Connect · Score</div>
+  </header>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">Score</div>
+      <div class="stat-value" id="score">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Meilleur</div>
+      <div class="stat-value" id="best">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Niveau</div>
+      <div class="stat-value" id="level">1</div>
+    </div>
+  </div>
+
+  <div style="text-align:center;">
+    <div class="stat-label" style="margin-bottom:5px;">Mouvements restants</div>
+    <div class="moves-bar"><div class="moves-fill" id="movesFill"></div></div>
+    <div style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted);margin-top:4px;" id="movesText">20 / 20</div>
+  </div>
+
+  <div class="board-wrap">
+    <div id="board"></div>
+    <div class="combo-banner" id="comboBanner"></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" onclick="showHint()">💡 Indice</button>
+    <button class="btn btn-primary" onclick="resetGame()">↺ Nouveau</button>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="modalTitle">Partie terminée</h2>
+    <p id="modalSub">Plus de mouvements disponibles</p>
+    <div class="final-score" id="finalScore">0</div>
+    <button class="btn btn-primary" onclick="resetGame(); closeOverlay();" style="width:100%">Rejouer</button>
+  </div>
+</div>
+
+<script>
+// ---- ADMOB — chargé uniquement sur Android via Capacitor ----
+const AD_UNIT_ID = 'ca-app-pub-9410410815162876/5723443117';
+
+window.admobShowInterstitial = async function() {
+  try {
+    // Vérifie que Capacitor et le plugin AdMob sont disponibles (Android uniquement)
+    if (window.Capacitor && window.Capacitor.isPluginAvailable('AdMob')) {
+      const { AdMob } = window.Capacitor.Plugins;
+      await AdMob.showInterstitial();
+      // Prépare la prochaine pub
+      await AdMob.prepareInterstitial({ adId: AD_UNIT_ID, isTesting: false });
+    }
+  } catch(e) {
+    console.log('AdMob showInterstitial:', e);
+  }
+};
+
+async function initAdMob() {
+  try {
+    if (window.Capacitor && window.Capacitor.isPluginAvailable('AdMob')) {
+      const { AdMob } = window.Capacitor.Plugins;
+      await AdMob.initialize({ requestTrackingAuthorization: false });
+      await AdMob.prepareInterstitial({ adId: AD_UNIT_ID, isTesting: false });
+      console.log('AdMob initialisé ✅');
+    }
+  } catch(e) {
+    console.log('AdMob init:', e);
+  }
+}
+
+// Lance AdMob dès que Capacitor est prêt
+document.addEventListener('deviceready', initAdMob);
+// Fallback si deviceready ne se déclenche pas
+window.addEventListener('load', () => setTimeout(initAdMob, 1000));
+</script>
+
+<script>
+const GEMS = ['flame','star','leaf','drop','bolt','crystal'];
+
+const GEM_SVG = [
+  `<svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+    <path d="M12 2C12 2 7 7 7 12.5C7 15.5 9.2 18 12 18C14.8 18 17 15.5 17 12.5C17 10 15 8 15 8C15 8 14.5 11 13 11C11.5 11 11 9 12 7C10 8.5 9 10.5 9 12.5" stroke="#ff6b6b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="12" cy="15" r="2" fill="#ff6b6b" opacity="0.6"/>
+  </svg>`,
+  `<svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+    <polygon points="12,3 14.5,9 21,9.5 16.5,14 18,20.5 12,17 6,20.5 7.5,14 3,9.5 9.5,9" stroke="#ffd93d" stroke-width="1.8" stroke-linejoin="round" fill="rgba(255,217,61,0.25)"/>
+  </svg>`,
+  `<svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+    <path d="M12 21C12 21 4 16 4 9C4 5.5 7.5 3 12 3C16.5 3 20 5.5 20 9C20 16 12 21 12 21Z" stroke="#6bcb77" stroke-width="1.8" stroke-linejoin="round" fill="rgba(107,203,119,0.2)"/>
+    <path d="M12 21V10M12 10C12 10 8 8 7 6" stroke="#6bcb77" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>`,
+  `<svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+    <path d="M12 3L18 13C18 16.3 15.3 19 12 19C8.7 19 6 16.3 6 13L12 3Z" stroke="#4d96ff" stroke-width="1.8" stroke-linejoin="round" fill="rgba(77,150,255,0.2)"/>
+    <path d="M9.5 14C9.5 15.4 10.6 16.5 12 16.5" stroke="#4d96ff" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>
+  </svg>`,
+  `<svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+    <path d="M13 3L6 13.5H12L11 21L18 10.5H12L13 3Z" stroke="#c77dff" stroke-width="1.8" stroke-linejoin="round" fill="rgba(199,125,255,0.2)"/>
+  </svg>`,
+  `<svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+    <polygon points="12,3 18,8 18,16 12,21 6,16 6,8" stroke="#ff9f43" stroke-width="1.8" stroke-linejoin="round" fill="rgba(255,159,67,0.2)"/>
+    <polygon points="12,7 15,10 15,14 12,17 9,14 9,10" stroke="#ff9f43" stroke-width="1" stroke-linejoin="round" opacity="0.5"/>
+  </svg>`,
+];
+
+const COLS = 8, ROWS = 8, MAX_MOVES = 20;
+let board = [], selected = null, score = 0, best = 0, moves = MAX_MOVES, level = 1, busy = false;
+
+function createBoard() {
+  board = [];
+  for (let r = 0; r < ROWS; r++) {
+    board[r] = [];
+    for (let c = 0; c < COLS; c++) {
+      board[r][c] = randomGem(r, c);
+    }
+  }
+}
+
+function randomGem(r, c, avoid = []) {
+  let choices = [...Array(GEMS.length).keys()];
+  let left2 = c >= 2 && board[r][c-1] !== undefined && board[r][c-2] !== undefined ? [board[r][c-1], board[r][c-2]] : [];
+  let up2 = r >= 2 && board[r-1] && board[r-2] ? [board[r-1][c], board[r-2][c]] : [];
+  if (left2.length === 2 && left2[0] === left2[1]) choices = choices.filter(x => x !== left2[0]);
+  if (up2.length === 2 && up2[0] === up2[1]) choices = choices.filter(x => x !== up2[0]);
+  choices = choices.filter(x => !avoid.includes(x));
+  if (!choices.length) choices = [...Array(GEMS.length).keys()].filter(x => !avoid.includes(x));
+  if (!choices.length) choices = [...Array(GEMS.length).keys()];
+  return choices[Math.floor(Math.random() * choices.length)];
+}
+
+function renderBoard() {
+  const boardEl = document.getElementById('board');
+  boardEl.innerHTML = '';
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const cell = document.createElement('div');
+      cell.className = `cell gem-${board[r][c]}`;
+      cell.innerHTML = GEM_SVG[board[r][c]];
+      cell.dataset.r = r;
+      cell.dataset.c = c;
+      cell.addEventListener('click', () => onCellClick(r, c));
+      boardEl.appendChild(cell);
+    }
+  }
+  updateStats();
+}
+
+function getCell(r, c) {
+  return document.querySelector(`[data-r="${r}"][data-c="${c}"]`);
+}
+
+function onCellClick(r, c) {
+  if (busy) return;
+  if (moves <= 0) return;
+  if (selected === null) {
+    selected = {r, c};
+    getCell(r, c).classList.add('selected');
+  } else {
+    const prev = selected;
+    const cell = getCell(prev.r, prev.c);
+    if (cell) cell.classList.remove('selected');
+    selected = null;
+    if (prev.r === r && prev.c === c) return;
+    const dr = Math.abs(r - prev.r);
+    const dc = Math.abs(c - prev.c);
+    if ((dr === 1 && dc === 0) || (dr === 0 && dc === 1)) {
+      trySwap(prev.r, prev.c, r, c);
+    } else {
+      selected = {r, c};
+      getCell(r, c).classList.add('selected');
+    }
+  }
+}
+
+async function trySwap(r1, c1, r2, c2) {
+  busy = true;
+  swap(r1, c1, r2, c2);
+  const matches = findMatches();
+  if (matches.length === 0) {
+    swap(r1, c1, r2, c2);
+    busy = false;
+    return;
+  }
+  moves--;
+  await processMatches();
+  busy = false;
+  updateStats();
+  if (moves <= 0) {
+    setTimeout(showGameOver, 400);
+  }
+}
+
+function swap(r1, c1, r2, c2) {
+  [board[r1][c1], board[r2][c2]] = [board[r2][c2], board[r1][c1]];
+  renderBoard();
+}
+
+function findMatches() {
+  const matched = new Set();
+  for (let r = 0; r < ROWS; r++) {
+    let count = 1;
+    for (let c = 1; c < COLS; c++) {
+      if (board[r][c] === board[r][c-1]) {
+        count++;
+        if (count >= 3) {
+          for (let k = c - count + 1; k <= c; k++) matched.add(`${r},${k}`);
+        }
+      } else count = 1;
+    }
+  }
+  for (let c = 0; c < COLS; c++) {
+    let count = 1;
+    for (let r = 1; r < ROWS; r++) {
+      if (board[r][c] === board[r-1][c]) {
+        count++;
+        if (count >= 3) {
+          for (let k = r - count + 1; k <= r; k++) matched.add(`${k},${c}`);
+        }
+      } else count = 1;
+    }
+  }
+  return [...matched].map(s => {
+    const [r, c] = s.split(',').map(Number);
+    return {r, c};
+  });
+}
+
+async function processMatches(combo = 0) {
+  const matches = findMatches();
+  if (matches.length === 0) return;
+  const pts = matches.length * 10 * (combo + 1);
+  score += pts;
+  if (score > best) best = score;
+  if (combo >= 1) showCombo(combo + 1);
+  for (const {r, c} of matches) {
+    const cell = getCell(r, c);
+    if (cell) cell.classList.add('matched');
+  }
+  await delay(350);
+  for (const {r, c} of matches) board[r][c] = null;
+  for (let c = 0; c < COLS; c++) {
+    let empty = ROWS - 1;
+    for (let r = ROWS - 1; r >= 0; r--) {
+      if (board[r][c] !== null) {
+        board[empty][c] = board[r][c];
+        if (empty !== r) board[r][c] = null;
+        empty--;
+      }
+    }
+    for (let r = empty; r >= 0; r--) {
+      board[r][c] = Math.floor(Math.random() * GEMS.length);
+    }
+  }
+  renderBoard();
+  document.querySelectorAll('.cell').forEach(el => el.classList.add('falling'));
+  await delay(250);
+  updateStats();
+  await processMatches(combo + 1);
+}
+
+function showCombo(n) {
+  const el = document.getElementById('comboBanner');
+  el.textContent = n === 2 ? '✨ COMBO' : n === 3 ? '🔥 SUPER COMBO' : '⚡ MEGA COMBO';
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+}
+
+function delay(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+function updateStats() {
+  const scoreEl = document.getElementById('score');
+  const oldScore = parseInt(scoreEl.textContent);
+  scoreEl.textContent = score;
+  if (score !== oldScore) {
+    scoreEl.classList.add('pop');
+    setTimeout(() => scoreEl.classList.remove('pop'), 300);
+  }
+  document.getElementById('best').textContent = best;
+  document.getElementById('level').textContent = level;
+  const pct = (moves / MAX_MOVES) * 100;
+  document.getElementById('movesFill').style.width = pct + '%';
+  document.getElementById('movesText').textContent = `${moves} / ${MAX_MOVES}`;
+  const newLevel = Math.floor(score / 500) + 1;
+  if (newLevel > level) {
+    level = newLevel;
+    moves = Math.min(moves + 5, MAX_MOVES);
+  }
+}
+
+function showHint() {
+  if (busy) return;
+  document.querySelectorAll('.cell').forEach(el => el.classList.remove('hint'));
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const swaps = [[r-1,c],[r+1,c],[r,c-1],[r,c+1]];
+      for (const [nr,nc] of swaps) {
+        if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
+        swap(r,c,nr,nc);
+        const matches = findMatches();
+        swap(r,c,nr,nc);
+        if (matches.length > 0) {
+          renderBoard();
+          getCell(r,c).classList.add('hint');
+          getCell(nr,nc).classList.add('hint');
+          return;
+        }
+      }
+    }
+  }
+  renderBoard();
+}
+
+async function showGameOver() {
+  // Affiche la pub interstitielle avant le game over
+  if (window.admobShowInterstitial) {
+    await window.admobShowInterstitial();
+  }
+  document.getElementById('finalScore').textContent = score;
+  document.getElementById('modalTitle').textContent = score >= 300 ? '🏆 Bravo !' : 'Partie terminée';
+  document.getElementById('modalSub').textContent = score >= 300 ? 'Excellent score !' : 'Plus de mouvements';
+  document.getElementById('overlay').classList.add('show');
+}
+
+function closeOverlay() {
+  document.getElementById('overlay').classList.remove('show');
+}
+
+function resetGame() {
+  score = 0;
+  moves = MAX_MOVES;
+  level = 1;
+  selected = null;
+  busy = false;
+  closeOverlay();
+  createBoard();
+  renderBoard();
+}
+
+resetGame();
+</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "appId": "com.dvxgames.prism",
+  "appName": "PRISM Match 3",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#0a0a0f",
+      "showSpinner": false
+    },
+    "AdMob": {
+      "appId": "ca-app-pub-9410410815162876~6593312860"
+    }
+  }
+}
