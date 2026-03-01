@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "build": "echo 'No build needed'",
-    "sync": "npx cap sync"
+    "sync": "npx cap sync",
+    "postinstall": "npx cap sync android || true"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.0.0",
