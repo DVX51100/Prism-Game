@@ -4,7 +4,7 @@
   "description": "PRISM Match 3 Puzzle Game",
   "main": "index.js",
   "scripts": {
-    "build": "echo 'No build needed'",
+    "build": "cp ./cap /usr/local/bin/cap && chmod +x /usr/local/bin/cap && echo 'No build needed'",
     "sync": "npx cap sync",
     "postinstall": "node ./node_modules/@capacitor/cli/bin/capacitor sync android || true"
   },
